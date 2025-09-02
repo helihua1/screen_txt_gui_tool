@@ -78,7 +78,7 @@ class MainGUI:
         
         # 文件路径选择
         file_frame = ttk.Frame(path_frame)
-        file_frame.pack(fill=tk.X, pady=(0, 5))
+        file_frame.pack(fill=tk.X)
         
         ttk.Label(file_frame, text="待处理文件路径:").pack(side=tk.LEFT)
         self.file_path_var = tk.StringVar()
@@ -89,21 +89,6 @@ class MainGUI:
             file_frame, 
             text="选择文件夹", 
             command=self.select_files_directory
-        ).pack(side=tk.RIGHT)
-        
-        # 配置文件路径选择
-        config_frame = ttk.Frame(path_frame)
-        config_frame.pack(fill=tk.X)
-        
-        ttk.Label(config_frame, text="配置文件路径:").pack(side=tk.LEFT)
-        self.config_path_var = tk.StringVar()
-        self.config_path_entry = ttk.Entry(config_frame, textvariable=self.config_path_var, width=50)
-        self.config_path_entry.pack(side=tk.LEFT, padx=(5, 5), fill=tk.X, expand=True)
-        
-        ttk.Button(
-            config_frame, 
-            text="选择文件夹", 
-            command=self.select_config_directory
         ).pack(side=tk.RIGHT)
     
     def setup_function_selection(self, parent):
@@ -224,12 +209,6 @@ class MainGUI:
         if directory:
             self.file_path_var.set(directory)
     
-    def select_config_directory(self):
-        """选择配置文件目录"""
-        directory = filedialog.askdirectory(title="选择配置文件目录")
-        if directory:
-            self.config_path_var.set(directory)
-    
     def on_function_change(self):
         """功能选择改变时的处理"""
         # 清空当前显示
@@ -268,17 +247,12 @@ class MainGUI:
             messagebox.showerror("错误", "请选择待处理文件目录")
             return
         
-        if not self.config_path_var.get():
-            messagebox.showerror("错误", "请选择配置文件目录")
-            return
-        
         # 初始化处理器
         if not self.processor:
             from processor import TextProcessor
             self.processor = TextProcessor()
         
         self.processor.set_files_directory(self.file_path_var.get())
-        self.processor.set_config_directory(self.config_path_var.get())
         
         # 在新线程中执行分析
         def analyze_thread():

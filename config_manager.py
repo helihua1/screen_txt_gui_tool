@@ -4,7 +4,7 @@ from typing import List
 class ConfigManager:
     """配置文件管理类，负责读取和管理关键词配置"""
     
-    def __init__(self, config_path: str = 'D:/sort/字符检查/config.txt'):
+    def __init__(self, config_path: str = 'config.txt'):
         self.config_path = config_path
         self.keywords = []
     
@@ -15,8 +15,14 @@ class ConfigManager:
                 with open(self.config_path, 'r', encoding='utf-8') as f:
                     content = f.read().strip()
                     if content:
-                        # 按空格分割关键词
-                        self.keywords = [keyword.strip() for keyword in content.split() if keyword.strip()]
+                        # 检查是否包含 "keywords = " 前缀
+                        if content.startswith('keywords = '):
+                            # 移除 "keywords = " 前缀，然后按空格分割关键词
+                            keywords_content = content[10:].strip()  # 移除 "keywords = " (10个字符)
+                            self.keywords = [keyword.strip() for keyword in keywords_content.split() if keyword.strip()]
+                        else:
+                            # 兼容旧格式，直接按空格分割
+                            self.keywords = [keyword.strip() for keyword in content.split() if keyword.strip()]
                     else:
                         self.keywords = []
             else:
