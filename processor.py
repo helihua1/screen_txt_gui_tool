@@ -23,12 +23,18 @@ class TextProcessor:
         self.config_manager.set_config_path(os.path.join(directory, 'config.txt'))
     
     def get_txt_files(self) -> List[str]:
-        """获取目录下所有txt文件"""
+        """获取目录下所有txt文件（包括子目录）"""
         if not self.files_directory or not os.path.exists(self.files_directory):
             return []
         
-        pattern = os.path.join(self.files_directory, "*.txt")
-        return glob.glob(pattern)
+        txt_files = []
+        # 使用os.walk递归遍历目录及其所有子目录
+        for root, dirs, files in os.walk(self.files_directory):
+            for file in files:
+                if file.lower().endswith('.txt'):
+                    txt_files.append(os.path.join(root, file))
+        
+        return txt_files
     
     def read_file_content(self, file_path: str) -> str:
         """读取文件内容"""
@@ -56,7 +62,7 @@ class TextProcessor:
         查找包含关键词的段落
         
         Returns:
-            Dict[str, List[Tuple[str, str]]]: {文件名: [(段落内容, 匹配的关键词)]}
+            Dict[str, List[Tuple[str, str]]]: {相对路径: [(段落内容, 匹配的关键词)]}
         """
         result = {}
         keywords = self.config_manager.load_keywords()
@@ -68,7 +74,8 @@ class TextProcessor:
         txt_files = self.get_txt_files()
         
         for file_path in txt_files:
-            filename = os.path.basename(file_path)
+            # 获取相对于files_directory的相对路径
+            rel_path = os.path.relpath(file_path, self.files_directory)
             content = self.read_file_content(file_path)
             
             if not content:
@@ -86,7 +93,7 @@ class TextProcessor:
                         break  # 找到一个关键词就够了
             
             if matching_paragraphs:
-                result[filename] = matching_paragraphs
+                result[rel_path] = matching_paragraphs
         
         return result
     
@@ -95,13 +102,14 @@ class TextProcessor:
         查找包含英文句子的段落
         
         Returns:
-            Dict[str, List[str]]: {文件名: [段落内容列表]}
+            Dict[str, List[str]]: {相对路径: [段落内容列表]}
         """
         result = {}
         txt_files = self.get_txt_files()
         
         for file_path in txt_files:
-            filename = os.path.basename(file_path)
+            # 获取相对于files_directory的相对路径
+            rel_path = os.path.relpath(file_path, self.files_directory)
             content = self.read_file_content(file_path)
             
             if not content:
@@ -117,7 +125,7 @@ class TextProcessor:
                     english_paragraphs.append(paragraph)
             
             if english_paragraphs:
-                result[filename] = english_paragraphs
+                result[rel_path] = english_paragraphs
         
         return result
     
@@ -126,7 +134,7 @@ class TextProcessor:
         查找包含乱码关键词的文件
         
         Returns:
-            Dict[str, List[Tuple[str, str]]]: {文件名: [(文件内容, 匹配的关键词)]}
+            Dict[str, List[Tuple[str, str]]]: {相对路径: [(文件内容, 匹配的关键词)]}
         """
         result = {}
         garbled_keywords = self.config_manager.load_garbled_keywords()
@@ -138,7 +146,8 @@ class TextProcessor:
         txt_files = self.get_txt_files()
         
         for file_path in txt_files:
-            filename = os.path.basename(file_path)
+            # 获取相对于files_directory的相对路径
+            rel_path = os.path.relpath(file_path, self.files_directory)
             content = self.read_file_content(file_path)
             
             if not content:
@@ -147,7 +156,7 @@ class TextProcessor:
             # 检查整个文件内容是否包含乱码关键词
             for keyword in garbled_keywords:
                 if keyword in content:
-                    result[filename] = [(content, keyword)]
+                    result[rel_path] = [(content, keyword)]
                     break  # 找到一个关键词就够了
         
         return result
