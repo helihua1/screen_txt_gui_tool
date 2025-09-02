@@ -35,9 +35,11 @@ class TextProcessor:
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 return f.read()
+
+        # 如果所有编码都失败，尝试用错误处理方式读取
         except Exception as e:
             print(f"读取文件 {file_path} 时出错: {e}")
-            return ""
+            return "格式错误，可能包含乱码€ ╋ ╅  ソ ュ等"
     
     def write_file_content(self, file_path: str, content: str):
         """写入文件内容"""
@@ -119,6 +121,37 @@ class TextProcessor:
         
         return result
     
+    def find_garbled_files(self) -> Dict[str, List[Tuple[str, str]]]:
+        """
+        查找包含乱码关键词的文件
+        
+        Returns:
+            Dict[str, List[Tuple[str, str]]]: {文件名: [(文件内容, 匹配的关键词)]}
+        """
+        result = {}
+        garbled_keywords = self.config_manager.load_garbled_keywords()
+        
+        if not garbled_keywords:
+            print("没有加载到乱码检测关键词")
+            return result
+        
+        txt_files = self.get_txt_files()
+        
+        for file_path in txt_files:
+            filename = os.path.basename(file_path)
+            content = self.read_file_content(file_path)
+            
+            if not content:
+                continue
+            
+            # 检查整个文件内容是否包含乱码关键词
+            for keyword in garbled_keywords:
+                if keyword in content:
+                    result[filename] = [(content, keyword)]
+                    break  # 找到一个关键词就够了
+        
+        return result
+    
     def remove_paragraphs_from_file(self, file_path: str, paragraphs_to_remove: List[str]) -> bool:
         """
         从文件中删除指定段落
@@ -152,6 +185,27 @@ class TextProcessor:
             
         except Exception as e:
             print(f"删除段落时出错: {e}")
+            return False
+    
+    def delete_file(self, file_path: str) -> bool:
+        """
+        删除文件
+        
+        Args:
+            file_path: 要删除的文件路径
+            
+        Returns:
+            bool: 是否成功删除
+        """
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+                return True
+            else:
+                print(f"文件不存在: {file_path}")
+                return False
+        except Exception as e:
+            print(f"删除文件时出错: {e}")
             return False
     
     def process_keyword_deletion(self, selected_items: Dict[str, List[str]]) -> bool:
@@ -206,4 +260,31 @@ class TextProcessor:
                 print(f"文件不存在: {filename}")
         
         print(f"英文句子删除完成: {success_count}/{total_count} 个文件处理成功")
+        return success_count == total_count
+    
+    def process_garbled_deletion(self, selected_items: Dict[str, List[str]]) -> bool:
+        """
+        处理乱码文件删除
+        
+        Args:
+            selected_items: 用户选择的要删除的项目 {文件名: [文件内容列表]}
+            
+        Returns:
+            bool: 是否成功处理
+        """
+        success_count = 0
+        total_count = len(selected_items)
+        
+        for filename, _ in selected_items.items():
+            file_path = os.path.join(self.files_directory, filename)
+            if os.path.exists(file_path):
+                if self.delete_file(file_path):
+                    success_count += 1
+                    print(f"成功删除文件: {filename}")
+                else:
+                    print(f"删除文件失败: {filename}")
+            else:
+                print(f"文件不存在: {filename}")
+        
+        print(f"乱码文件删除完成: {success_count}/{total_count} 个文件删除成功")
         return success_count == total_count 

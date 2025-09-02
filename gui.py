@@ -2,6 +2,8 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, scrolledtext
 from typing import Dict, List, Callable
 import threading
+import subprocess
+import os
 
 class ParagraphDetailWindow:
     """段落详情窗口，用于显示段落的完整内容"""
@@ -114,6 +116,14 @@ class MainGUI:
             command=self.on_function_change
         ).pack(anchor=tk.W)
         
+        ttk.Radiobutton(
+            func_frame, 
+            text="删除带有乱码的文件", 
+            variable=self.function_var, 
+            value="garbled",
+            command=self.on_function_change
+        ).pack(anchor=tk.W)
+        
         # 关键词显示区域
         self.keywords_frame = ttk.LabelFrame(func_frame, text="目标删除关键词", padding=5)
         self.keywords_frame.pack(fill=tk.X, pady=(10, 0))
@@ -217,6 +227,8 @@ class MainGUI:
         # 更新关键词显示
         if self.function_var.get() == "keyword":
             self.update_keywords_display()
+        elif self.function_var.get() == "garbled":
+            self.update_garbled_keywords_display()
     
     def update_keywords_display(self):
         """更新关键词显示"""
@@ -228,6 +240,22 @@ class MainGUI:
             keywords_text = " ".join(keywords)
         else:
             keywords_text = "未加载到关键词"
+        
+        self.keywords_text.config(state=tk.NORMAL)
+        self.keywords_text.delete(1.0, tk.END)
+        self.keywords_text.insert(1.0, keywords_text)
+        self.keywords_text.config(state=tk.DISABLED)
+    
+    def update_garbled_keywords_display(self):
+        """更新乱码关键词显示"""
+        if not self.processor:
+            return
+        
+        garbled_keywords = self.processor.config_manager.get_garbled_keywords()
+        if garbled_keywords:
+            keywords_text = " ".join(garbled_keywords)
+        else:
+            keywords_text = "未加载到乱码检测关键词"
         
         self.keywords_text.config(state=tk.NORMAL)
         self.keywords_text.delete(1.0, tk.END)
@@ -259,8 +287,10 @@ class MainGUI:
             try:
                 if self.function_var.get() == "keyword":
                     data = self.processor.find_keyword_paragraphs()
-                else:
+                elif self.function_var.get() == "english":
                     data = self.processor.find_english_paragraphs()
+                elif self.function_var.get() == "garbled":
+                    data = self.processor.find_garbled_files()
                 
                 # 在主线程中更新UI
                 self.root.after(0, lambda: self.update_display(data))
@@ -281,12 +311,21 @@ class MainGUI:
         
         # 填充数据
         for filename, items in data.items():
+            # 构建完整文件路径
+            full_file_path = os.path.join(self.file_path_var.get(), filename)
+            
             for item in items:
                 if isinstance(item, tuple):
-                    # 关键词匹配模式：item是(paragraph, keyword)元组
+                    # 关键词匹配模式或乱码检测模式：item是(paragraph, keyword)元组
                     paragraph, keyword = item
-                    display_text = paragraph[:100] + "..." if len(paragraph) > 100 else paragraph
-                    item_values = ("✓", filename, keyword, display_text)
+                    if self.function_var.get() == "garbled":
+                        # 乱码检测模式：显示文件内容的前100个字符
+                        display_text = paragraph[:100] + "..." if len(paragraph) > 100 else paragraph
+                        item_values = ("✓", filename, keyword, display_text)
+                    else:
+                        # 关键词匹配模式：显示段落内容的前100个字符
+                        display_text = paragraph[:100] + "..." if len(paragraph) > 100 else paragraph
+                        item_values = ("✓", filename, keyword, display_text)
                 else:
                     # 英文检测模式：item是paragraph字符串
                     paragraph = item
@@ -295,13 +334,16 @@ class MainGUI:
                 
                 tree_item = self.tree.insert("", tk.END, values=item_values)
                 
-                # 使用item的tags存储完整内容用于双击查看
-                self.tree.item(tree_item, tags=(paragraph,))
+                # 使用tags存储完整内容用于双击查看，以及完整文件路径
+                self.tree.item(tree_item, tags=(paragraph, full_file_path))
         
         # 默认全选
         self.select_all()
         
-        messagebox.showinfo("完成", f"分析完成，找到 {len(data)} 个文件包含符合条件的段落")
+        if self.function_var.get() == "garbled":
+            messagebox.showinfo("完成", f"分析完成，找到 {len(data)} 个包含乱码关键词的文件")
+        else:
+            messagebox.showinfo("完成", f"分析完成，找到 {len(data)} 个文件包含符合条件的段落")
     
     def on_item_click(self, event):
         """单击项目时的处理 - 切换选择状态"""
@@ -319,16 +361,40 @@ class MainGUI:
         """双击项目时的处理"""
         item = self.tree.identify_row(event.y)
         if item:
+            column = self.tree.identify_column(event.x)
             filename = self.tree.item(item, "values")[1]  # 文件名列现在是第2列
             tags = self.tree.item(item, "tags")
             paragraph_full = tags[0] if tags else ""
+            full_file_path = tags[1] if len(tags) > 1 else ""  # 完整文件路径
             
-            if paragraph_full:
-                ParagraphDetailWindow(
-                    self.root, 
-                    f"段落详情 - {filename}", 
-                    paragraph_full
-                )
+            # 检查是否双击了文件名列（第2列）
+            if column == "#2":  # 文件名列
+                # 使用存储的完整文件路径
+                if full_file_path and os.path.exists(full_file_path):
+                    try:
+                        # 使用系统默认程序打开文件（记事本）
+                        subprocess.Popen(['notepad.exe', full_file_path])
+                    except Exception as e:
+                        messagebox.showerror("错误", f"无法打开文件: {e}")
+                else:
+                    messagebox.showerror("错误", f"文件不存在: {full_file_path}")
+            else:
+                # 其他列的双击行为保持不变
+                if paragraph_full:
+                    if self.function_var.get() == "garbled":
+                        # 乱码检测模式：显示整个文件内容
+                        ParagraphDetailWindow(
+                            self.root, 
+                            f"文件详情 - {filename}", 
+                            paragraph_full
+                        )
+                    else:
+                        # 其他模式：显示段落内容
+                        ParagraphDetailWindow(
+                            self.root, 
+                            f"段落详情 - {filename}", 
+                            paragraph_full
+                        )
     
     def select_all(self):
         """全选"""
@@ -366,10 +432,16 @@ class MainGUI:
             return
         
         # 确认删除
-        result = messagebox.askyesno(
-            "确认删除", 
-            f"确定要删除选中的 {len(self.selected_items)} 个文件中的段落吗？\n此操作不可撤销！"
-        )
+        if self.function_var.get() == "garbled":
+            result = messagebox.askyesno(
+                "确认删除", 
+                f"确定要删除选中的 {len(self.selected_items)} 个文件吗？\n此操作不可撤销！"
+            )
+        else:
+            result = messagebox.askyesno(
+                "确认删除", 
+                f"确定要删除选中的 {len(self.selected_items)} 个文件中的段落吗？\n此操作不可撤销！"
+            )
         
         if not result:
             return
@@ -379,8 +451,10 @@ class MainGUI:
             try:
                 if self.function_var.get() == "keyword":
                     success = self.processor.process_keyword_deletion(self.selected_items)
-                else:
+                elif self.function_var.get() == "english":
                     success = self.processor.process_english_deletion(self.selected_items)
+                elif self.function_var.get() == "garbled":
+                    success = self.processor.process_garbled_deletion(self.selected_items)
                 
                 if success:
                     self.root.after(0, lambda: messagebox.showinfo("完成", "删除操作完成"))
