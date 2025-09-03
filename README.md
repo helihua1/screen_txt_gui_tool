@@ -1,5 +1,5 @@
-![image](https://github.com/helihua1/screen_txt_gui_tool/blob/main/gui.png)
 
+<img src="https://github.com/helihua1/screen_txt_gui_tool/blob/main/gui.png" width="400">
 有包含很多txt文件的文件夹，。现在要对这些txt文件的内容进行批量处理，使用python，Tkinter，
 
 第一个功能：删除带有关键词的段落（段落的判断是从上个换行到下个换行之间算一段）：有一个keyword.txt文件中，路径是‘D:/sort/字符检查/测试数据’是本次处理需要的一批关键词，中间用空格隔开，。目录下txt中包含这些关键词的段落要整段删掉。删掉前把文件名和需要删掉的段落（可能有很多组）在tkinter的gui中显示，让用户确认是否删除，确认后在文件中删除勾选框打钩的段落。
